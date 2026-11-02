@@ -34,6 +34,17 @@
 
 系统要求：Windows 10 / 11 64 位，.NET Framework 4.8（系统自带），无需 Python / Node.js。程序未做数字签名，SmartScreen 提示时选择“更多信息 → 仍要运行”。
 
+## 发行作品（GitHub Releases）
+
+每个版本都已创建独立的 GitHub Release，包含 `HamStartup-vX.Y.exe`、`HamStartup-vX.Y.zip`、`Instructions-vX.Y.md` 和 `SHA256SUMS-vX.Y.txt`：
+
+| 版本 | 发行作品 | 主要内容 |
+|---|---|---|
+| **v1.3（当前）** | [v1.3 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.3) | HAM 工作台、连接联动、三种 UI |
+| v1.2 | [v1.2 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.2) | 方案制、运行监测、服务检测 |
+| v1.1 | [v1.1 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.1) | 便携设置、快捷方式、QLog 修复 |
+| v1.0 | [v1.0 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.0) | 初始版本、顺序启动、UDP 联动 |
+
 ## 快速开始
 
 1. 下载并解压 `HamStartup-v1.3.zip`，双击 `HamStartup.exe`。
