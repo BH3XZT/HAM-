@@ -1,0 +1,19 @@
+# Build output
+dist/
+*.pdb
+*.obj
+*.user
+*.suo
+.vs/
+
+# Keep the versioned release binaries
+!releases/**/*.exe
+
+# Local/runtime data (never publish user configuration)
+HamStartup.settings.ini
+*.settings.ini
+logs/
+backups/
+debug.log
+testdata/
+tests/*.exe
