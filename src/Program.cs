@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -11,11 +12,25 @@ namespace HamStartup
 {
     internal static class Program
     {
+        /// <summary>产品版本号（与 AssemblyInfo.cs 保持一致）。</summary>
+        public const string ProductVersion = "1.6.0";
+
+        [DllImport("kernel32.dll")]
+        private static extern bool AttachConsole(int processId);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool FreeConsole();
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
         [STAThread]
         private static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            if (TryHandleInfoArgs(args)) return;
 
             string requestedConfig = null;
             bool autoStart = false;
@@ -138,6 +153,87 @@ namespace HamStartup
             {
                 Application.DoEvents();
                 Thread.Sleep(25);
+            }
+        }
+
+        /// <summary>
+        /// 处理 --help / --version：写入父控制台（如果是从命令行启动），
+        /// 双击启动没有控制台时用弹窗显示。
+        /// </summary>
+        private static bool TryHandleInfoArgs(string[] args)
+        {
+            bool help = false;
+            bool version = false;
+            foreach (string arg in args)
+            {
+                if (arg.Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("/?", StringComparison.OrdinalIgnoreCase))
+                    help = true;
+                else if (arg.Equals("--version", StringComparison.OrdinalIgnoreCase) ||
+                         arg.Equals("-v", StringComparison.OrdinalIgnoreCase))
+                    version = true;
+            }
+            if (!help && !version) return false;
+
+            StringBuilder text = new StringBuilder();
+            if (version)
+            {
+                text.AppendLine("HAM 工作台 " + ProductVersion);
+                try
+                {
+                    text.AppendLine("文件版本：" + typeof(Program).Assembly.GetName().Version.ToString());
+                }
+                catch { }
+            }
+            if (help)
+            {
+                text.AppendLine("用法：HamStartup.exe [选项]");
+                text.AppendLine();
+                text.AppendLine("  --help, -h              显示本帮助");
+                text.AppendLine("  --version, -v           显示版本号");
+                text.AppendLine("  --autostart             打开后自动开始启动流程");
+                text.AppendLine("  --quit-after-start      启动流程结束后退出");
+                text.AppendLine("  --config <路径>         使用指定的 settings.ini");
+                text.AppendLine("  --no-elevate            受限权限时不弹“以管理员身份重启”提示");
+                text.AppendLine("  --screenshot <png>      截图模式（用于生成发布截图）");
+                text.AppendLine("  --tab <0-3>             截图页：0=启动顺序 1=连接联动 2=运行监测 3=授时");
+                text.AppendLine("  --scroll <y>            截图时滚动连接联动页");
+                text.AppendLine("  --wait <毫秒>           截图前等待时间（默认 1600）");
+                text.AppendLine();
+                text.AppendLine("不带参数时打开图形界面；所有设置自动保存。");
+            }
+            WriteInfoText(text.ToString());
+            return true;
+        }
+
+        private static void WriteInfoText(string text)
+        {
+            bool attached = false;
+            try { attached = AttachConsole(-1); } catch { }
+            bool hasConsole = false;
+            try { hasConsole = GetConsoleWindow() != IntPtr.Zero; } catch { }
+            bool redirected = false;
+            try { redirected = Console.IsOutputRedirected; } catch { }
+
+            if (attached || hasConsole || redirected)
+            {
+                try
+                {
+                    Console.Out.Write(text);
+                    Console.Out.Flush();
+                }
+                catch { }
+            }
+            if (attached)
+            {
+                try { FreeConsole(); } catch { }
+            }
+
+            if (!hasConsole && !redirected)
+            {
+                MessageBox.Show(text, "HAM 工作台 " + ProductVersion,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

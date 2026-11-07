@@ -26,8 +26,33 @@ namespace HamStartup
             get { return _started; }
         }
 
+        /// <summary>
+        /// “启动流程开始前自动授时”：顺序启动与全部同时启动两种模式都先执行一次，
+        /// 失败只告警，不阻断后续软件启动。
+        /// </summary>
+        private void RunAutoTimeSyncIfNeeded()
+        {
+            if (_settings.TimeSync == null || !_settings.TimeSync.Enabled || !_settings.TimeSync.AutoBeforeStart) return;
+
+            _log("▶ 启动前授时（IC-705 GPS）", LogKind.Step);
+            TimeSyncResult tsResult = TimeSyncRunner.Run(_settings.TimeSync, "sync");
+            if (tsResult.Success)
+            {
+                _log(string.Format("  授时完成（{0:0.0} 秒），继续启动软件", tsResult.Seconds), LogKind.Success);
+            }
+            else
+            {
+                string reason = string.IsNullOrEmpty(tsResult.Error) ? ("退出码 " + tsResult.ExitCode) : tsResult.Error.Trim();
+                _log("  授时失败：" + reason, LogKind.Warn);
+                _log("  已跳过自动授时，继续按配置启动软件。", LogKind.Warn);
+            }
+        }
+
         public async Task RunAsync(CancellationToken token)
         {
+            // 启动方案前的自动授时（授时页可勾选）
+            RunAutoTimeSyncIfNeeded();
+
             List<AppEntry> apps = new List<AppEntry>();
             foreach (AppEntry a in _settings.Apps)
             {
@@ -122,7 +147,11 @@ namespace HamStartup
                     continue;
                 }
 
-                if (_settings.WaitForWindows && app.WaitForWindow && app.WaitSeconds > 0)
+                if (app.WaitForExit)
+                {
+                    await WaitForExitStepAsync(process, app, token);
+                }
+                else if (_settings.WaitForWindows && app.WaitForWindow && app.WaitSeconds > 0)
                 {
                     bool ready = await WaitForWindowAsync(process, app, token);
                     if (!ready && process != null && !HasExitedSafe(process))
@@ -155,6 +184,9 @@ namespace HamStartup
 
         public async Task RunAllAtOnceAsync(CancellationToken token)
         {
+            // 启动方案前的自动授时（授时页可勾选）
+            RunAutoTimeSyncIfNeeded();
+
             List<AppEntry> apps = new List<AppEntry>();
             foreach (AppEntry a in _settings.Apps)
             {
@@ -172,8 +204,62 @@ namespace HamStartup
             int failed = 0;
 
             _log("模式：全部同时启动（忽略顺序）", LogKind.Step);
+
+            // 需要“等待进程结束”的步骤（授时/脚本）先按顺序执行完，再并行启动其余软件，
+            // 否则 JTDX 可能抢先占用串口。
+            List<AppEntry> prerequisites = new List<AppEntry>();
+            foreach (AppEntry a in apps)
+            {
+                if (a.WaitForExit) prerequisites.Add(a);
+            }
+            if (prerequisites.Count > 0)
+            {
+                _log("先按顺序执行需要等待结束的前置步骤（授时/脚本）", LogKind.Info);
+            }
+            foreach (AppEntry app in prerequisites)
+            {
+                token.ThrowIfCancellationRequested();
+                _log("▶ " + app.Name, LogKind.Step);
+                _log("  启动方式：" + ProcessUtil.DescribeStart(app), LogKind.Info);
+                if (!app.PathExists)
+                {
+                    _log("  找不到程序文件：" + (string.IsNullOrEmpty(app.ExePath) ? "(未设置路径)" : app.ExePath), LogKind.Error);
+                    failed++;
+                    continue;
+                }
+                Process existing = ProcessUtil.FindRunning(app);
+                if (existing != null && _settings.SkipRunning)
+                {
+                    _log("  已在运行，跳过启动", LogKind.Warn);
+                    skipped++;
+                    continue;
+                }
+                try
+                {
+                    Process process = ProcessUtil.Start(app);
+                    if (process != null) _started.Add(process);
+                    started++;
+                    await WaitForExitStepAsync(process, app, token);
+                }
+                catch (Win32Exception ex)
+                {
+                    _log("  启动失败：" + StartupErrorText(ex), LogKind.Error);
+                    failed++;
+                }
+                catch (Exception ex)
+                {
+                    _log("  启动失败：" + ex.Message, LogKind.Error);
+                    failed++;
+                }
+                if (app.DelaySeconds > 0)
+                {
+                    await Task.Delay(app.DelaySeconds * 1000, token);
+                }
+            }
+
             foreach (AppEntry app in apps)
             {
+                if (app.WaitForExit) continue;   // 已作为前置步骤执行
                 token.ThrowIfCancellationRequested();
                 _log("▶ " + app.Name, LogKind.Step);
                 _log("  启动方式：" + ProcessUtil.DescribeStart(app), LogKind.Info);
@@ -245,8 +331,53 @@ namespace HamStartup
             return ex.Message;
         }
 
-        private async Task<bool> WaitForWindowAsync(Process process, AppEntry app, CancellationToken token)
+        /// <summary>
+        /// 等待一个"命令行/脚本"进程真正退出，再继续下一步。
+        /// 用于授时工具（ic705timesync sync 等）：它们没有主窗口，必须等进程结束。
+        /// </summary>
+        private async Task WaitForExitStepAsync(Process process, AppEntry app, CancellationToken token)
         {
+            int limit = app.WaitSeconds > 0 ? app.WaitSeconds : 60;
+            if (process == null)
+            {
+                _log("  系统未返回进程句柄，无法等待退出，按固定延时继续", LogKind.Warn);
+                await Task.Delay(Math.Min(limit, 5) * 1000, token);
+                return;
+            }
+
+            _log(string.Format("  等待进程退出（最多 {0} 秒）…", limit), LogKind.Info);
+            Stopwatch watch = Stopwatch.StartNew();
+            while (watch.Elapsed.TotalSeconds < limit)
+            {
+                token.ThrowIfCancellationRequested();
+                try
+                {
+                    if (process.HasExited)
+                    {
+                        int code = SafeExitCode(process);
+                        _log(string.Format("  进程已退出（{0:0.0} 秒，退出码 {1}）",
+                            watch.Elapsed.TotalSeconds, code),
+                            code == 0 ? LogKind.Success : LogKind.Warn);
+                        return;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    return;
+                }
+                catch { }
+                await Task.Delay(200, token);
+            }
+            _log(string.Format("  等待进程退出超时（{0} 秒），继续下一步", limit), LogKind.Warn);
+        }
+
+        private static int SafeExitCode(Process process)
+        {
+            try { return process.ExitCode; }
+            catch { return -1; }
+        }
+
+        private async Task<bool> WaitForWindowAsync(Process process, AppEntry app, CancellationToken token)        {
             if (process == null) return false;
             Stopwatch watch = Stopwatch.StartNew();
             int accessDenied = 0;
@@ -484,3 +615,4 @@ namespace HamStartup
         }
     }
 }
+

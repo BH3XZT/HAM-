@@ -29,9 +29,11 @@ namespace HamStartup
         private Panel _tabStartPanel;
         private Panel _tabUdpPanel;
         private Panel _tabMonitorPanel;
+        private Panel _tabTimePanel;
         private Button _tabStartButton;
         private Button _tabUdpButton;
         private Button _tabMonitorButton;
+        private Button _tabTimeButton;
         private Panel _tabIndicator;
         private NotifyIcon _tray;
         private int _activeTab;
@@ -190,13 +192,13 @@ namespace HamStartup
 
         private void SelectTab(int index)
         {
-            if (index < 0 || index > 2) return;
+            if (index < 0 || index > 3) return;
             if (_activeTab == 1 && index != 1) CommitUdpFields();
             _activeTab = index;
 
             if (_tabStartPanel == null) return;
-            Panel[] panels = new Panel[] { _tabStartPanel, _tabUdpPanel, _tabMonitorPanel };
-            Button[] buttons = new Button[] { _tabStartButton, _tabUdpButton, _tabMonitorButton };
+            Panel[] panels = new Panel[] { _tabStartPanel, _tabUdpPanel, _tabMonitorPanel, _tabTimePanel };
+            Button[] buttons = new Button[] { _tabStartButton, _tabUdpButton, _tabMonitorButton, _tabTimeButton };
             for (int i = 0; i < panels.Length; i++)
             {
                 if (panels[i] == null) continue;
@@ -220,6 +222,7 @@ namespace HamStartup
             }
 
             Button active = buttons[index];
+            if (active == null || _tabIndicator == null) return;
             _tabIndicator.Width = active.Width - 44;
             _tabIndicator.Left = active.Left + 22;
             _tabIndicator.BringToFront();
@@ -256,7 +259,7 @@ namespace HamStartup
             _pill.Location = new Point(1000, 15);
             _header.Controls.Add(_pill);
 
-            _headerSaveHint = UiTheme.MakeLabel("v1.3.1  ·  配置自动保存", 8.5f, Color.FromArgb(110, 134, 163));
+            _headerSaveHint = UiTheme.MakeLabel("v" + Program.ProductVersion + "  ·  配置自动保存", 8.5f, Color.FromArgb(110, 134, 163));
             _headerSaveHint.Location = new Point(1000, 48);
             _header.Controls.Add(_headerSaveHint);
 
@@ -298,6 +301,10 @@ namespace HamStartup
             _tabMonitorButton.Click += delegate { SelectTab(2); };
             _tabBar.Controls.Add(_tabMonitorButton);
 
+            _tabTimeButton = MakeTabButton("授时", 398);
+            _tabTimeButton.Click += delegate { SelectTab(3); };
+            _tabBar.Controls.Add(_tabTimeButton);
+
             _tabIndicator = new Panel();
             _tabIndicator.Height = 3;
             _tabIndicator.Width = 82;
@@ -307,7 +314,7 @@ namespace HamStartup
             _tabBar.Controls.Add(_tabIndicator);
 
             Label tabHint = UiTheme.MakeLabel("所有修改即时保存", 8.3f, UiTheme.TextFaint);
-            tabHint.Location = new Point(430, 14);
+            tabHint.Location = new Point(500, 14);
             _tabBar.Controls.Add(tabHint);
 
             _tabContent = new Panel();
@@ -329,11 +336,18 @@ namespace HamStartup
             _tabMonitorPanel.BackColor = UiTheme.Bg;
             _tabMonitorPanel.Visible = false;
 
+            _tabTimePanel = new Panel();
+            _tabTimePanel.Dock = DockStyle.Fill;
+            _tabTimePanel.BackColor = UiTheme.Bg;
+            _tabTimePanel.Visible = false;
+
             BuildStartupTab(_tabStartPanel);
             BuildUdpTab(_tabUdpPanel);
             BuildMonitorTab(_tabMonitorPanel);
+            BuildTimeSyncTab(_tabTimePanel);
             BuildUiModeSelector(_tabBar);
 
+            _tabContent.Controls.Add(_tabTimePanel);
             _tabContent.Controls.Add(_tabMonitorPanel);
             _tabContent.Controls.Add(_tabUdpPanel);
             _tabContent.Controls.Add(_tabStartPanel);
@@ -870,3 +884,7 @@ namespace HamStartup
         }
     }
 }
+
+
+
+

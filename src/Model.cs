@@ -26,6 +26,11 @@ namespace HamStartup
         public int WaitSeconds = 30;
         public int DelaySeconds = 3;
         public bool RunAsAdmin = false;
+        /// <summary>
+        /// 等待进程退出后再执行下一步。用于命令行工具/脚本（例如 IC-705 授时），
+        /// 这类程序没有主窗口，需要按"进程结束"而不是"窗口出现"来同步。
+        /// </summary>
+        public bool WaitForExit = false;
 
         private ShortcutInfo _shortcut;
         private string _shortcutFor = "";
@@ -223,6 +228,20 @@ namespace HamStartup
         public string QlogForwardAddr = "127.0.0.1";
     }
 
+    /// <summary>IC-705 授时（ic705timesync）的配置与状态。</summary>
+    public class TimeSyncSettings
+    {
+        public bool Enabled = true;
+        public string ExePath = "";
+        public string Transport = "serial";      // 只支持 serial（串口：RemoteUty 虚拟串口 / USB）；lan（WiFi 直连）自 v1.5.2 起移除
+        public string Port = "auto";             // auto 或 COM20
+        public string Host = "192.168.59.1";     // 旧 lan 模式电台 IP，仅保留兼容旧配置，不再使用
+        public int WaitSeconds = 30;
+        public bool RunAsAdmin = true;
+        public bool AutoBeforeStart = false;     // 启动方案前自动对时
+        public string LastResult = "";
+    }
+
     public class Scheme
     {
         public string Id = "";
@@ -256,6 +275,7 @@ namespace HamStartup
         public string ViewMode = "classic";
         public List<LinkProfile> Links = new List<LinkProfile>();
         public UdpSettings Udp = new UdpSettings();
+        public TimeSyncSettings TimeSync = new TimeSyncSettings();
 
         public Scheme ActiveScheme
         {
@@ -447,6 +467,7 @@ namespace HamStartup
                 app.WaitSeconds = ini.GetInt(appSection, "waitSeconds", app.WaitSeconds);
                 app.DelaySeconds = ini.GetInt(appSection, "delaySeconds", app.DelaySeconds);
                 app.RunAsAdmin = ini.GetBool(appSection, "runAsAdmin", app.RunAsAdmin);
+                app.WaitForExit = ini.GetBool(appSection, "waitExit", app.WaitForExit);
                 scheme.Apps.Add(app);
             }
             return scheme;
@@ -537,6 +558,19 @@ namespace HamStartup
             u.QlogTtl = ini.GetInt("udp", "qlogTtl", u.QlogTtl);
             u.QlogForwardAddr = ini.Get("udp", "qlogForwardAddr", u.QlogForwardAddr);
 
+            TimeSyncSettings ts = s.TimeSync;
+            ts.Enabled = ini.GetBool("timesync", "enabled", ts.Enabled);
+            ts.ExePath = ini.Get("timesync", "exePath", ts.ExePath);
+            ts.Transport = ini.Get("timesync", "transport", ts.Transport);
+            // v1.5.2 起 WiFi 直连（lan）被移除：旧配置里的 transport=lan 自动按串口处理。
+            if (!string.Equals(ts.Transport, "serial", StringComparison.OrdinalIgnoreCase)) ts.Transport = "serial";
+            ts.Port = ini.Get("timesync", "port", ts.Port);
+            ts.Host = ini.Get("timesync", "host", ts.Host);
+            ts.WaitSeconds = ini.GetInt("timesync", "waitSeconds", ts.WaitSeconds);
+            ts.RunAsAdmin = ini.GetBool("timesync", "runAsAdmin", ts.RunAsAdmin);
+            ts.AutoBeforeStart = ini.GetBool("timesync", "autoBeforeStart", ts.AutoBeforeStart);
+            ts.LastResult = ini.Get("timesync", "lastResult", ts.LastResult);
+
             return s;
         }
 
@@ -611,6 +645,7 @@ namespace HamStartup
                     ini.Set(appSection, "waitSeconds", app.WaitSeconds.ToString());
                     ini.Set(appSection, "delaySeconds", app.DelaySeconds.ToString());
                     ini.Set(appSection, "runAsAdmin", app.RunAsAdmin ? "True" : "False");
+                    ini.Set(appSection, "waitExit", app.WaitForExit ? "True" : "False");
                 }
             }
 
@@ -629,6 +664,17 @@ namespace HamStartup
             ini.Set("udp", "qlogJoin", u.QlogJoin ? "True" : "False");
             ini.Set("udp", "qlogTtl", u.QlogTtl.ToString());
             ini.Set("udp", "qlogForwardAddr", u.QlogForwardAddr);
+
+            TimeSyncSettings tsv = TimeSync ?? new TimeSyncSettings();
+            ini.Set("timesync", "enabled", tsv.Enabled ? "True" : "False");
+            ini.Set("timesync", "exePath", tsv.ExePath ?? "");
+            ini.Set("timesync", "transport", tsv.Transport ?? "serial");
+            ini.Set("timesync", "port", tsv.Port ?? "auto");
+            ini.Set("timesync", "host", tsv.Host ?? "");
+            ini.Set("timesync", "waitSeconds", tsv.WaitSeconds.ToString());
+            ini.Set("timesync", "runAsAdmin", tsv.RunAsAdmin ? "True" : "False");
+            ini.Set("timesync", "autoBeforeStart", tsv.AutoBeforeStart ? "True" : "False");
+            ini.Set("timesync", "lastResult", tsv.LastResult ?? "");
 
             ini.Save(ConfigPath);
         }

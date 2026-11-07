@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -21,6 +21,7 @@ namespace HamStartup
         private NumericUpDown _delaySeconds;
         private CheckBox _chkWaitWindow;
         private CheckBox _chkAdmin;
+        private CheckBox _chkWaitExit;
         private Button _btnBrowse;
         private Button _btnAutoDetect;
         private Button _btnUp;
@@ -415,10 +416,10 @@ namespace HamStartup
             _btnBrowse.Click += BrowseForExe;
             card.Controls.Add(_btnBrowse);
 
-            card.Controls.Add(DetailLabel("启动参数（可选）", 160));
+            card.Controls.Add(DetailLabel("启动参数（可选）", 152));
 
             _argsBox = new TextBox();
-            _argsBox.Location = new Point(18, 176);
+            _argsBox.Location = new Point(18, 168);
             _argsBox.Font = UiTheme.Font(9f);
             _argsBox.BorderStyle = BorderStyle.FixedSingle;
             _argsBox.Leave += delegate { CommitArgsFromBox(); };
@@ -426,7 +427,7 @@ namespace HamStartup
 
             _chkWaitWindow = new CheckBox();
             _chkWaitWindow.Text = "等待主窗口出现";
-            _chkWaitWindow.Location = new Point(18, 214);
+            _chkWaitWindow.Location = new Point(18, 200);
             _chkWaitWindow.AutoSize = true;
             _chkWaitWindow.Font = UiTheme.Font(9f);
             _chkWaitWindow.BackColor = Color.White;
@@ -434,7 +435,7 @@ namespace HamStartup
             card.Controls.Add(_chkWaitWindow);
 
             _waitSeconds = new NumericUpDown();
-            _waitSeconds.Location = new Point(150, 212);
+            _waitSeconds.Location = new Point(150, 198);
             _waitSeconds.Width = 58;
             _waitSeconds.Minimum = 1;
             _waitSeconds.Maximum = 300;
@@ -445,15 +446,15 @@ namespace HamStartup
             card.Controls.Add(_waitSeconds);
 
             Label sec1 = UiTheme.MakeLabel("秒内", 8.8f, UiTheme.TextMuted);
-            sec1.Location = new Point(214, 216);
+            sec1.Location = new Point(214, 202);
             card.Controls.Add(sec1);
 
             Label delayLabel = UiTheme.MakeLabel("启动后额外等待", 9f, UiTheme.Text);
-            delayLabel.Location = new Point(18, 248);
+            delayLabel.Location = new Point(18, 228);
             card.Controls.Add(delayLabel);
 
             _delaySeconds = new NumericUpDown();
-            _delaySeconds.Location = new Point(150, 244);
+            _delaySeconds.Location = new Point(150, 224);
             _delaySeconds.Width = 58;
             _delaySeconds.Minimum = 0;
             _delaySeconds.Maximum = 300;
@@ -464,35 +465,44 @@ namespace HamStartup
             card.Controls.Add(_delaySeconds);
 
             Label sec2 = UiTheme.MakeLabel("秒", 8.8f, UiTheme.TextMuted);
-            sec2.Location = new Point(214, 248);
+            sec2.Location = new Point(214, 228);
             card.Controls.Add(sec2);
 
             _chkAdmin = new CheckBox();
             _chkAdmin.Text = "以管理员身份启动（会弹出 UAC）";
-            _chkAdmin.Location = new Point(18, 276);
+            _chkAdmin.Location = new Point(18, 252);
             _chkAdmin.AutoSize = true;
             _chkAdmin.Font = UiTheme.Font(9f);
             _chkAdmin.BackColor = Color.White;
             _chkAdmin.CheckedChanged += delegate { CommitDetailFields(); };
             card.Controls.Add(_chkAdmin);
 
+            _chkWaitExit = new CheckBox();
+            _chkWaitExit.Text = "等待进程退出（命令行工具/脚本）";
+            _chkWaitExit.Location = new Point(18, 280);
+            _chkWaitExit.AutoSize = true;
+            _chkWaitExit.Font = UiTheme.Font(9f);
+            _chkWaitExit.BackColor = Color.White;
+            _chkWaitExit.CheckedChanged += delegate { CommitDetailFields(); };
+            card.Controls.Add(_chkWaitExit);
+
             _btnUp = UiTheme.SmallButton("↑ 上移", 56, 30);
-            _btnUp.Location = new Point(18, 306);
+            _btnUp.Location = new Point(18, 310);
             _btnUp.Click += delegate { MoveSelected(-1); };
             card.Controls.Add(_btnUp);
 
             _btnDown = UiTheme.SmallButton("↓ 下移", 56, 30);
-            _btnDown.Location = new Point(80, 306);
+            _btnDown.Location = new Point(80, 310);
             _btnDown.Click += delegate { MoveSelected(1); };
             card.Controls.Add(_btnDown);
 
             _btnAutoDetect = UiTheme.SmallButton("自动检测", 88, 30);
-            _btnAutoDetect.Location = new Point(142, 306);
+            _btnAutoDetect.Location = new Point(142, 310);
             _btnAutoDetect.Click += AutoDetectClicked;
             card.Controls.Add(_btnAutoDetect);
 
             Button desktop = UiTheme.SmallButton("桌面图标", 80, 30);
-            desktop.Location = new Point(236, 306);
+            desktop.Location = new Point(236, 310);
             desktop.Click += UseDesktopShortcutClicked;
             card.Controls.Add(desktop);
 
@@ -705,6 +715,7 @@ namespace HamStartup
 
         private static string FormatWait(AppEntry app)
         {
+            if (app.WaitForExit) return "等待退出 " + (app.WaitSeconds > 0 ? app.WaitSeconds : 60) + "s";
             if (!app.WaitForWindow) return "延时 " + app.DelaySeconds + "s";
             return app.WaitSeconds + "s + " + app.DelaySeconds + "s";
         }
@@ -749,6 +760,7 @@ namespace HamStartup
                 _delaySeconds.Value = 3;
                 _chkWaitWindow.Checked = true;
                 _chkAdmin.Checked = false;
+                _chkWaitExit.Checked = false;
                 SetDetailEnabled(false);
             }
             else
@@ -762,10 +774,12 @@ namespace HamStartup
                 _pathBox.Text = app.ExePath ?? "";
                 _argsBox.Text = app.Arguments ?? "";
                 _chkWaitWindow.Checked = app.WaitForWindow;
+                _chkWaitExit.Checked = app.WaitForExit;
+                _chkWaitWindow.Enabled = !app.WaitForExit;
                 _waitSeconds.Value = Clamp(app.WaitSeconds, (int)_waitSeconds.Minimum, (int)_waitSeconds.Maximum);
                 _delaySeconds.Value = Clamp(app.DelaySeconds, (int)_delaySeconds.Minimum, (int)_delaySeconds.Maximum);
                 _chkAdmin.Checked = app.RunAsAdmin;
-                _waitSeconds.Enabled = app.WaitForWindow;
+                _waitSeconds.Enabled = app.WaitForWindow || app.WaitForExit;
 
                 bool running = ProcessUtil.IsRunning(app);
                 _detailStatus.Text = running ? "● 正在运行" : "○ 未运行";
@@ -782,6 +796,7 @@ namespace HamStartup
             _waitSeconds.Enabled = enabled;
             _delaySeconds.Enabled = enabled;
             _chkAdmin.Enabled = enabled;
+            _chkWaitExit.Enabled = enabled;
             _btnBrowse.Enabled = enabled;
             _btnAutoDetect.Enabled = enabled;
             _btnUp.Enabled = enabled;
@@ -805,8 +820,9 @@ namespace HamStartup
             app.WaitSeconds = (int)_waitSeconds.Value;
             app.DelaySeconds = (int)_delaySeconds.Value;
             app.RunAsAdmin = _chkAdmin.Checked;
-            _waitSeconds.Enabled = app.WaitForWindow;
-            _chkWaitWindow.Enabled = true;
+            app.WaitForExit = _chkWaitExit.Checked;
+            _waitSeconds.Enabled = app.WaitForWindow || app.WaitForExit;
+            _chkWaitWindow.Enabled = !app.WaitForExit;
 
             UpdateRow(app);
             TrySave();
@@ -1018,3 +1034,6 @@ namespace HamStartup
         }
     }
 }
+
+
+

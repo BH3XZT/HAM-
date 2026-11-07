@@ -103,13 +103,14 @@ namespace HamStartup
 
         public static string DescribeStart(AppEntry app)
         {
+            string suffix = app.WaitForExit ? "  [等待进程退出]" : "";
             if (app.IsShortcut)
             {
                 ShortcutInfo info = app.Shortcut;
                 if (info == null || !info.Valid) return "快捷方式（无法解析）";
-                return "快捷方式 → " + info.TargetPath + "  [起始目录 " + info.WorkingDirectory + "]";
+                return "快捷方式 → " + info.TargetPath + "  [起始目录 " + info.WorkingDirectory + "]" + suffix;
             }
-            return app.ExePath + "  [起始目录 " + app.WorkingDirectory + "]";
+            return app.ExePath + "  [起始目录 " + app.WorkingDirectory + "]" + suffix;
         }
 
         private static Process WaitForStarted(AppEntry app, int milliseconds)
