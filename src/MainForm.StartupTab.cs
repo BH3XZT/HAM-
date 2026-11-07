@@ -35,6 +35,9 @@ namespace HamStartup
 
         private bool _updatingDetail;
         private bool _loadingList;
+        private SplitContainer _startupSplit;
+        private bool _startupSplitInitialized;
+        private int _dragSourceIndex = -1;
 
         private void BuildStartupTab(Panel page)
         {
@@ -44,7 +47,7 @@ namespace HamStartup
             root.ColumnCount = 1;
             root.RowCount = 4;
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
             page.Controls.Add(root);
@@ -238,8 +241,8 @@ namespace HamStartup
             title.Location = new Point(0, 0);
             bar.Controls.Add(title);
 
-            Label hint = UiTheme.MakeLabel("勾选参与启动的软件；用上移/下移调整先后；启动顺序自上而下执行。", 8.8f, UiTheme.TextMuted);
-            hint.Location = new Point(0, 22);
+            Label hint = UiTheme.MakeLabel("勾选参与启动的软件；可直接拖动列表行调整先后；启动顺序自上而下执行。", 8.8f, UiTheme.TextMuted);
+            hint.Location = new Point(0, 24);
             bar.Controls.Add(hint);
 
             FlowLayoutPanel tools = new FlowLayoutPanel();
@@ -285,14 +288,14 @@ namespace HamStartup
 
         private Control BuildStartupContent()
         {
-            TableLayoutPanel content = new TableLayoutPanel();
-            content.Dock = DockStyle.Fill;
-            content.BackColor = UiTheme.Bg;
-            content.ColumnCount = 2;
-            content.RowCount = 1;
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 352));
-            content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            _startupSplit = new SplitContainer();
+            _startupSplit.Dock = DockStyle.Fill;
+            _startupSplit.Orientation = Orientation.Vertical;
+            _startupSplit.SplitterWidth = 7;
+            _startupSplit.Panel1MinSize = 0;
+            _startupSplit.Panel2MinSize = 0;
+            _startupSplit.BackColor = Color.FromArgb(190, 203, 220);
+            if (_resizeTip != null) _resizeTip.SetToolTip(_startupSplit, "拖动分隔条调整左侧列表与右侧编辑区的宽度");
 
             _list = new ListView();
             _list.Dock = DockStyle.Fill;
@@ -330,9 +333,35 @@ namespace HamStartup
                 if (app != null && !string.IsNullOrEmpty(app.Directory)) ProcessUtil.OpenFolder(app.Directory);
             };
 
-            content.Controls.Add(_list, 0, 0);
-            content.Controls.Add(BuildDetailCard(), 1, 0);
-            return content;
+            _list.AllowDrop = true;
+            _list.ItemDrag += delegate(object sender, ItemDragEventArgs e)
+            {
+                ListViewItem item = e.Item as ListViewItem;
+                if (item == null) return;
+                _dragSourceIndex = item.Index;
+                _list.DoDragDrop(item, DragDropEffects.Move);
+            };
+            _list.DragEnter += delegate(object sender, DragEventArgs e)
+            {
+                e.Effect = e.Data.GetDataPresent(typeof(ListViewItem)) ? DragDropEffects.Move : DragDropEffects.None;
+            };
+            _list.DragOver += delegate(object sender, DragEventArgs e)
+            {
+                e.Effect = DragDropEffects.Move;
+            };
+            _list.DragDrop += delegate(object sender, DragEventArgs e)
+            {
+                if (_dragSourceIndex < 0) return;
+                Point point = _list.PointToClient(new Point(e.X, e.Y));
+                ListViewItem target = _list.GetItemAt(point.X, point.Y);
+                int targetIndex = target == null ? _settings.Apps.Count - 1 : target.Index;
+                MoveAppTo(_dragSourceIndex, targetIndex);
+                _dragSourceIndex = -1;
+            };
+
+            _startupSplit.Panel1.Controls.Add(_list);
+            _startupSplit.Panel2.Controls.Add(BuildDetailCard());
+            return _startupSplit;
         }
 
         private Control BuildDetailCard()
@@ -836,6 +865,34 @@ namespace HamStartup
                     text += "\n快捷方式无效：" + (info == null ? "无法解析" : info.Error);
             }
             return text;
+        }
+
+        private void MoveAppTo(int source, int target)
+        {
+            if (source < 0 || source >= _settings.Apps.Count) return;
+            if (target < 0) target = 0;
+            if (target >= _settings.Apps.Count) target = _settings.Apps.Count - 1;
+            if (source == target) return;
+
+            AppEntry app = _settings.Apps[source];
+            _settings.Apps.RemoveAt(source);
+            if (target > source) target--;
+            if (target < 0) target = 0;
+            if (target > _settings.Apps.Count) target = _settings.Apps.Count;
+            _settings.Apps.Insert(target, app);
+
+            BuildAppList();
+            foreach (ListViewItem item in _list.Items)
+            {
+                if (object.ReferenceEquals(item.Tag, app))
+                {
+                    item.Selected = true;
+                    item.Focused = true;
+                    break;
+                }
+            }
+            TrySave();
+            AppendLog(string.Format("已拖动调整：{0} 移到第 {1} 位。", app.Name, target + 1), LogKind.Info);
         }
 
         private void MoveSelected(int direction)

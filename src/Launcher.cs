@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -315,50 +316,161 @@ namespace HamStartup
             _log("无法自动前置 JTDX 窗口，请手动切换", LogKind.Warn);
         }
 
-        /// <summary>Closes only the processes this session started. Blocking; call from a worker.</summary>
+        public bool HasStoppableTargets()
+        {
+            foreach (Process p in _started)
+            {
+                try { if (!p.HasExited) return true; }
+                catch { }
+            }
+            foreach (AppEntry app in _settings.Apps)
+            {
+                if (ProcessUtil.IsRunning(app)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Closes all running processes of the current scheme, plus processes started this session.</summary>
         public void StopAllSync()
         {
-            if (_started.Count == 0)
+            List<Process> targets = new List<Process>();
+            HashSet<int> seen = new HashSet<int>();
+
+            AddProcessTargets(targets, seen, _started);
+            foreach (AppEntry app in _settings.Apps)
             {
-                _log("本次没有由启动器启动的软件需要关闭。", LogKind.Info);
+                string name = app.ProcessName;
+                if (string.IsNullOrEmpty(name)) continue;
+                Process[] all = null;
+                try { all = Process.GetProcessesByName(name); }
+                catch { }
+                if (all != null) AddProcessTargets(targets, seen, all);
+            }
+
+            if (targets.Count == 0)
+            {
+                _log("当前没有正在运行的目标软件。", LogKind.Info);
                 return;
             }
 
-            for (int i = _started.Count - 1; i >= 0; i--)
+            _log("开始停止 " + targets.Count + " 个进程…", LogKind.Step);
+
+            // First give every process a chance to close through its window.
+            foreach (Process p in targets)
             {
-                Process p = _started[i];
-                string name = "进程";
-                try { name = p.ProcessName + " (PID " + p.Id + ")"; }
-                catch { }
-
-                if (HasExitedSafe(p))
-                {
-                    _log(name + " 已经退出", LogKind.Info);
-                    continue;
-                }
-
-                _log("正在关闭 " + name + " …", LogKind.Info);
+                if (HasExitedSafe(p)) continue;
                 try
                 {
-                    bool requested = p.CloseMainWindow();
-                    if (requested && p.WaitForExit(4000))
-                    {
-                        _log("  已正常关闭", LogKind.Success);
-                        continue;
-                    }
-                    if (!HasExitedSafe(p))
-                    {
-                        p.Kill();
-                        p.WaitForExit(3000);
-                        _log("  已强制结束", LogKind.Warn);
-                    }
+                    p.CloseMainWindow();
+                }
+                catch { }
+            }
+
+            // Wait a bit for the main windows and their child processes to exit.
+            Stopwatch wait = Stopwatch.StartNew();
+            while (wait.ElapsedMilliseconds < 4000)
+            {
+                bool alive = false;
+                foreach (Process p in targets)
+                {
+                    if (!HasExitedSafe(p)) { alive = true; break; }
+                }
+                if (!alive) break;
+                System.Threading.Thread.Sleep(150);
+            }
+
+            List<Process> stubborn = new List<Process>();
+            foreach (Process p in targets)
+            {
+                if (HasExitedSafe(p)) continue;
+                string name = "进程";
+                int pid = 0;
+                try { name = p.ProcessName; pid = p.Id; } catch { }
+                try
+                {
+                    p.Kill();
+                    p.WaitForExit(1500);
+                    if (!HasExitedSafe(p)) stubborn.Add(p);
+                    else _log("  已结束 " + name + " (PID " + pid + ")", LogKind.Warn);
                 }
                 catch (Exception ex)
                 {
-                    _log("  无法关闭：" + ex.Message + "（如为管理员进程请手动关闭）", LogKind.Error);
+                    stubborn.Add(p);
+                    _log("  无法结束 " + name + " (PID " + pid + ")：" + ex.Message, LogKind.Warn);
                 }
             }
+
+            // Elevated Ham programs cannot be killed by a non-elevated launcher.
+            // Ask Windows once for an elevated taskkill; the user can cancel the UAC prompt.
+            if (stubborn.Count > 0)
+            {
+                List<int> pids = new List<int>();
+                foreach (Process p in stubborn)
+                {
+                    try { pids.Add(p.Id); }
+                    catch { }
+                }
+                if (pids.Count > 0) TryElevatedTaskKill(pids);
+            }
+
+            int stillRunning = 0;
+            foreach (Process p in targets)
+                if (!HasExitedSafe(p)) stillRunning++;
+
+            if (stillRunning == 0)
+                _log("停止全部完成，目标软件已关闭。", LogKind.Success);
+            else
+                _log("仍有 " + stillRunning + " 个进程未关闭；如为管理员进程，请以管理员身份运行本工具后重试。", LogKind.Warn);
+
+            foreach (Process p in targets) p.Dispose();
         }
+
+        private static void AddProcessTargets(List<Process> targets, HashSet<int> seen, IEnumerable<Process> processes)
+        {
+            if (processes == null) return;
+            foreach (Process p in processes)
+            {
+                if (p == null) continue;
+                int pid = 0;
+                try { pid = p.Id; }
+                catch { continue; }
+                if (!seen.Add(pid)) continue;
+                targets.Add(p);
+            }
+        }
+
+        private void TryElevatedTaskKill(List<int> pids)
+        {
+            try
+            {
+                StringBuilder args = new StringBuilder("/F /T");
+                foreach (int pid in pids) args.Append(" /PID ").Append(pid);
+                _log("  正在请求管理员权限结束 " + pids.Count + " 个进程…", LogKind.Warn);
+                ProcessStartInfo psi = new ProcessStartInfo("taskkill.exe", args.ToString());
+                psi.UseShellExecute = true;
+                psi.Verb = "runas";
+                psi.WindowStyle = ProcessWindowStyle.Hidden;
+                Process killer = Process.Start(psi);
+                if (killer != null)
+                {
+                    killer.WaitForExit(15000);
+                    _log("  已执行管理员 taskkill。", LogKind.Info);
+                    killer.Dispose();
+                }
+            }
+            catch (Win32Exception ex)
+            {
+                if (ex.NativeErrorCode == 1223)
+                    _log("  用户取消了管理员权限；部分软件可能仍在运行。", LogKind.Warn);
+                else
+                    _log("  管理员结束进程失败：" + ex.Message, LogKind.Warn);
+            }
+            catch (Exception ex)
+            {
+                _log("  管理员结束进程失败：" + ex.Message, LogKind.Warn);
+            }
+        }
+
 
         public async Task StopAllAsync()
         {

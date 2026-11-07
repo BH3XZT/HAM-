@@ -6,9 +6,9 @@
 
 > 旧名称：**HAM 启动台**。从 v1.3 起更名为 **HAM 工作台**；程序文件名仍保留 `HamStartup.exe`，以兼容旧快捷方式和已有配置。
 
-![方案启动 + 卡片 + 网络拓扑](releases/v1.3/screenshot-start.png)
+![方案启动 + 卡片 + 网络拓扑](releases/v1.3.1/screenshot-start.png)
 
-![连接联动卡片](releases/v1.3/screenshot-connection.png)
+![连接联动卡片](releases/v1.3.1/screenshot-connection.png)
 
 ## 功能
 
@@ -25,7 +25,8 @@
 
 | 版本 | 程序 | 压缩包 | 说明 |
 |---|---|---|---|
-| **v1.3（当前）** | [HamStartup.exe](releases/v1.3/HamStartup.exe) | [HamStartup-v1.3.zip](releases/v1.3/HamStartup-v1.3.zip) | [使用说明](releases/v1.3/使用说明.md) |
+| **v1.3.1（当前）** | [HamStartup.exe](releases/v1.3.1/HamStartup.exe) | [HamStartup-v1.3.1.zip](releases/v1.3.1/HamStartup-v1.3.1.zip) | [使用说明](releases/v1.3.1/使用说明.md) |
+| v1.3 | [HamStartup.exe](releases/v1.3/HamStartup.exe) | [HamStartup-v1.3.zip](releases/v1.3/HamStartup-v1.3.zip) | [使用说明](releases/v1.3/使用说明.md) |
 | v1.2 | [HamStartup.exe](releases/v1.2/HamStartup.exe) | [HamStartup-v1.2.zip](releases/v1.2/HamStartup-v1.2.zip) | [使用说明](releases/v1.2/使用说明.md) |
 | v1.1 | [HamStartup.exe](releases/v1.1/HamStartup.exe) | [HamStartup-v1.1.zip](releases/v1.1/HamStartup-v1.1.zip) | [使用说明](releases/v1.1/使用说明.md) |
 | v1.0 | [HamStartup.exe](releases/v1.0/HamStartup.exe) | [HamStartup-v1.0.zip](releases/v1.0/HamStartup-v1.0.zip) | [使用说明](releases/v1.0/使用说明.md) |
@@ -40,14 +41,15 @@
 
 | 版本 | 发行作品 | 主要内容 |
 |---|---|---|
-| **v1.3（当前）** | [v1.3 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.3) | HAM 工作台、连接联动、三种 UI |
+| **v1.3.1（当前）** | [v1.3.1 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.3.1) | 消除相关测试 bug、可拖拽调整、停止全部修复 |
+| v1.3 | [v1.3 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.3) | HAM 工作台、连接联动、三种 UI |
 | v1.2 | [v1.2 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.2) | 方案制、运行监测、服务检测 |
 | v1.1 | [v1.1 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.1) | 便携设置、快捷方式、QLog 修复 |
 | v1.0 | [v1.0 Release](https://github.com/BH3XZT/HAM-/releases/tag/v1.0) | 初始版本、顺序启动、UDP 联动 |
 
 ## 快速开始
 
-1. 下载并解压 `HamStartup-v1.3.zip`，双击 `HamStartup.exe`。
+1. 下载并解压 `HamStartup-v1.3.1.zip`，双击 `HamStartup.exe`。
 2. 在“启动方案”里选择方案，点“添加软件”选择本机已安装的 Ham 程序。
 3. 勾选软件、调整顺序；需要同时启动时勾选“全部同时启动（忽略顺序）”。
 4. 点启动，完成后在“运行监测”页查看软件状态、UDP/DX/ADI 和自动匹配的连接方案。
@@ -69,17 +71,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 ## 目录结构
 
 ```text
-src/                 v1.3 C# 源码（WinForms / .NET Framework 4.8）
+src/                 v1.3.1 C# 源码（WinForms / .NET Framework 4.8）
 assets/              图标与内嵌资源
 build.ps1            csc.exe 构建脚本
 app.manifest         Windows 清单
-releases/v1.0-v1.3/  各版本 exe、zip、使用说明、截图
+releases/v1.0-v1.3.1/ 各版本 exe、zip、使用说明、截图
 legacy/v1.0-source/  v1.0 历史源码
-docs/                v1.3 界面截图
+docs/                v1.3.1 界面截图
 ```
 
 ## 版本历史
 
+- **v1.3.1**：消除相关测试 bug；修复“停止全部”不关闭软件；增加三处分隔条拖拽调整和列表/卡片拖动排序。
 - **v1.3**：更名 HAM 工作台；连接联动支持 UDP/TCP/串口/自定义、自动匹配、参数下载；新增经典/卡片/卡片+拓扑三种 UI。
 - **v1.2**：启动方案制；启动后自动检测 UDP/DX/ADI；新增运行监测页、卡死/崩溃提示。
 - **v1.1**：便携设置；支持桌面 `.lnk` 快捷方式；低完整性权限提示；QLog 配置问题修复。

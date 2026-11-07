@@ -15,6 +15,7 @@ namespace HamStartup
         private TopologyView _startupTopology;
         private FlowLayoutPanel _startupCards;
         private bool _loadingStartupCards;
+        private AppEntry _dragCardApp;
 
         private Panel _udpContentHost;
         private Panel _udpCardView;
@@ -46,6 +47,23 @@ namespace HamStartup
             _startupCards.Padding = new Padding(2, 2, 2, 8);
             _startupCards.BackColor = UiTheme.Bg;
             _startupCards.Resize += delegate { ResizeStartupCards(); };
+            _startupCards.AllowDrop = true;
+            _startupCards.DragEnter += delegate(object sender, DragEventArgs e)
+            {
+                e.Effect = e.Data.GetDataPresent(typeof(AppEntry)) ? DragDropEffects.Move : DragDropEffects.None;
+            };
+            _startupCards.DragDrop += delegate(object sender, DragEventArgs e)
+            {
+                AppEntry source = e.Data.GetData(typeof(AppEntry)) as AppEntry;
+                if (source == null) return;
+                Point point = _startupCards.PointToClient(new Point(e.X, e.Y));
+                Control child = _startupCards.GetChildAtPoint(point);
+                AppEntry target = child == null ? null : child.Tag as AppEntry;
+                int sourceIndex = _settings.Apps.IndexOf(source);
+                int targetIndex = target == null ? _settings.Apps.Count - 1 : _settings.Apps.IndexOf(target);
+                MoveAppTo(sourceIndex, targetIndex);
+                _dragCardApp = null;
+            };
 
             _startupCardTable = new TableLayoutPanel();
             _startupCardTable.Dock = DockStyle.Fill;
@@ -73,6 +91,13 @@ namespace HamStartup
                 card.Width = width;
                 card.Height = 88;
                 card.Margin = new Padding(4, 2, 4, 8);
+                card.Tag = app;
+                card.MouseDown += delegate(object sender, MouseEventArgs e)
+                {
+                    if (e.Button != MouseButtons.Left) return;
+                    _dragCardApp = app;
+                    card.DoDragDrop(app, DragDropEffects.Move);
+                };
 
                 CheckBox enabled = new CheckBox();
                 enabled.Text = app.Name;
@@ -99,7 +124,7 @@ namespace HamStartup
                 path.ForeColor = app.PathExists ? UiTheme.TextMuted : UiTheme.Red;
                 path.BackColor = Color.White;
                 path.Location = new Point(14, 36);
-                path.Width = width - 280;
+                path.Width = Math.Max(200, width - 330);
                 path.Height = 18;
                 card.Controls.Add(path);
 
@@ -133,6 +158,27 @@ namespace HamStartup
                 delete.Location = new Point(width - 104, 14);
                 delete.Click += delegate { DeleteAppFromCard(app); };
                 card.Controls.Add(delete);
+
+                Label grip = new Label();
+                grip.Text = "⋮⋮";
+                grip.AutoSize = false;
+                grip.Width = 26;
+                grip.Height = 28;
+                grip.TextAlign = ContentAlignment.MiddleCenter;
+                grip.Font = UiTheme.Font(10f, FontStyle.Bold);
+                grip.ForeColor = UiTheme.TextFaint;
+                grip.BackColor = Color.White;
+                grip.Cursor = Cursors.SizeAll;
+                grip.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+                grip.Location = new Point(width - 278, 14);
+                grip.MouseDown += delegate(object sender, MouseEventArgs e)
+                {
+                    if (e.Button != MouseButtons.Left) return;
+                    _dragCardApp = app;
+                    card.DoDragDrop(app, DragDropEffects.Move);
+                };
+                card.Controls.Add(grip);
+                if (_resizeTip != null) _resizeTip.SetToolTip(grip, "按住拖动调整启动顺序");
 
                 _startupCards.Controls.Add(card);
             }

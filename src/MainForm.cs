@@ -37,6 +37,9 @@ namespace HamStartup
         private int _activeTab;
         private RichTextBox _log;
         private Label _runHint;
+        private SplitContainer _mainSplit;
+        private bool _mainSplitInitialized;
+        private ToolTip _resizeTip;
 
         private static readonly object LogFileLock = new object();
 
@@ -60,6 +63,8 @@ namespace HamStartup
             DoubleBuffered = true;
 
             LoadSettings();
+            _launcher = new Launcher(_settings, OnLauncherLog);
+            _resizeTip = new ToolTip();
             BuildShell();
             RefreshSchemeCombo();
 
@@ -113,6 +118,8 @@ namespace HamStartup
             {
                 BeginInvoke(new Action(delegate
                 {
+                    InitializeSplitLayout();
+                    RefreshStatus();
                     RefreshMonitor(true);
                     if (_settings.AutoShowMonitor && _monitorSnapshot != null &&
                         _monitorSnapshot.RunningCount > 0)
@@ -216,6 +223,7 @@ namespace HamStartup
             _tabIndicator.Width = active.Width - 44;
             _tabIndicator.Left = active.Left + 22;
             _tabIndicator.BringToFront();
+            if (index == 0 || index == 2) InitializeSplitLayout();
         }
 
         private void BuildShell()
@@ -248,7 +256,7 @@ namespace HamStartup
             _pill.Location = new Point(1000, 15);
             _header.Controls.Add(_pill);
 
-            _headerSaveHint = UiTheme.MakeLabel("v1.3  ·  配置自动保存", 8.5f, Color.FromArgb(110, 134, 163));
+            _headerSaveHint = UiTheme.MakeLabel("v1.3.1  ·  配置自动保存", 8.5f, Color.FromArgb(110, 134, 163));
             _headerSaveHint.Location = new Point(1000, 48);
             _header.Controls.Add(_headerSaveHint);
 
@@ -335,12 +343,69 @@ namespace HamStartup
             body.Controls.Add(tabHost);
 
             Panel logPanel = BuildLogPanel();
+            logPanel.Dock = DockStyle.Fill;
 
-            Controls.Add(body);
-            Controls.Add(logPanel);
+            _mainSplit = new SplitContainer();
+            _mainSplit.Dock = DockStyle.Fill;
+            _mainSplit.Orientation = Orientation.Horizontal;
+            _mainSplit.SplitterWidth = 7;
+            _mainSplit.Panel1MinSize = 380;
+            _mainSplit.Panel2MinSize = 70;
+            _mainSplit.BackColor = Color.FromArgb(190, 203, 220);
+            _mainSplit.Panel1.Controls.Add(body);
+            _mainSplit.Panel2.Controls.Add(logPanel);
+            _resizeTip.SetToolTip(_mainSplit, "拖动分隔条调整上方内容与运行日志的高度");
+
+            Controls.Add(_mainSplit);
             Controls.Add(_header);
 
+            Shown += delegate
+            {
+                try
+                {
+                    int distance = _mainSplit.Height - 118;
+                    _mainSplit.SplitterDistance = Math.Max(_mainSplit.Panel1MinSize,
+                        Math.Min(distance, _mainSplit.Height - _mainSplit.Panel2MinSize - _mainSplit.SplitterWidth));
+                }
+                catch { }
+            };
+
             SelectTab(0);
+        }
+
+        private void InitializeSplitLayout()
+        {
+            try
+            {
+                if (_mainSplit != null && _mainSplit.IsHandleCreated && !_mainSplitInitialized && _mainSplit.Height > 300)
+                {
+                    int distance = _mainSplit.Height - 118;
+                    _mainSplit.SplitterDistance = Math.Max(_mainSplit.Panel1MinSize,
+                        Math.Min(distance, _mainSplit.Height - _mainSplit.Panel2MinSize - _mainSplit.SplitterWidth));
+                    _mainSplitInitialized = true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_startupSplit != null && _startupSplit.IsHandleCreated && !_startupSplitInitialized && _startupSplit.Width > 1000)
+                {
+                    _startupSplit.SplitterDistance = Math.Max(320, _startupSplit.Width - 352);
+                    _startupSplitInitialized = true;
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (_monitorSplit != null && _monitorSplit.IsHandleCreated && !_monitorSplitInitialized && _monitorSplit.Width > 1000)
+                {
+                    _monitorSplit.SplitterDistance = Math.Max(360, _monitorSplit.Width - 390);
+                    _monitorSplitInitialized = true;
+                }
+            }
+            catch { }
         }
 
         private Image LoadLogo()
@@ -588,6 +653,8 @@ namespace HamStartup
                 _detailStatus.Text = isRunning ? "● 正在运行" : "○ 未运行";
                 _detailStatus.ForeColor = isRunning ? UiTheme.Green : UiTheme.TextFaint;
             }
+            if (_list != null) _list.Refresh();
+            UpdateStopButton();
         }
 
         private void UpdateHeaderPill(int running)
@@ -698,7 +765,6 @@ namespace HamStartup
         private void SetRunningUi(bool running)
         {
             _btnStart.Enabled = !running;
-            _btnStop.Enabled = running;
             _list.Enabled = !running;
             _chkOptionsWait.Enabled = !running;
             _chkOptionsSkip.Enabled = !running;
@@ -709,23 +775,43 @@ namespace HamStartup
                 ? (_settings.LaunchAllAtOnce ? "正在同时启动全部软件，请稍候…" : "正在按顺序启动，请稍候…")
                 : BuildRunHintText();
             _runHint.ForeColor = running ? UiTheme.Accent : UiTheme.TextMuted;
+            UpdateStopButton();
             UpdateHeaderPill(0);
+        }
+
+        private void UpdateStopButton()
+        {
+            if (_btnStop == null) return;
+            bool enabled = _running || (_launcher != null && _launcher.HasStoppableTargets());
+            _btnStop.Enabled = enabled;
+            _btnStop.ForeColor = enabled ? UiTheme.Text : UiTheme.TextFaint;
+            _btnStop.BackColor = enabled ? Color.White : Color.FromArgb(246, 248, 251);
+            _btnStop.Cursor = enabled ? Cursors.Hand : Cursors.Default;
+            if (_resizeTip != null)
+                _resizeTip.SetToolTip(_btnStop, enabled ? "关闭当前方案中正在运行的软件" : "当前没有正在运行的软件");
         }
 
         private async void StopSequence()
         {
-            if (_launcher == null) return;
+            if (_launcher == null) _launcher = new Launcher(_settings, OnLauncherLog);
+            if (!_running && !_launcher.HasStoppableTargets())
+            {
+                MessageBox.Show(this, "当前没有正在运行的目标软件。", "停止全部",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             DialogResult result = MessageBox.Show(this,
-                "将关闭本次由启动器启动的软件（不会影响原本已在运行的实例）。\n是否继续？",
+                "将关闭当前方案中正在运行的软件，包括启动前已运行的实例和本次由启动器打开的软件。\n是否继续？",
                 "停止全部", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (result != DialogResult.Yes) return;
 
             if (_cts != null) _cts.Cancel();
             if (_inspector != null) _inspector.MuteAlertsUntil = DateTime.Now.AddSeconds(20);
             _btnStop.Enabled = false;
-            _runHint.Text = "正在关闭已启动的软件…";
+            _runHint.Text = "正在关闭全部软件…";
             await _launcher.StopAllAsync();
-            _btnStop.Enabled = _running;
+            UpdateStopButton();
             RefreshStatus();
             if (_startupCardView != null && _startupCardView.Visible) RefreshStartupCards();
         }

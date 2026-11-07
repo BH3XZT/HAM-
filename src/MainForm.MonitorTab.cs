@@ -12,6 +12,8 @@ namespace HamStartup
         private Label _monitorSummary;
         private Label _monitorAlert;
         private TextBox _monitorDetail;
+        private SplitContainer _monitorSplit;
+        private bool _monitorSplitInitialized;
         private RuntimeInspector _inspector;
         private RuntimeSnapshot _monitorSnapshot;
         private CheckBox _chkMonitorEnabled;
@@ -114,14 +116,14 @@ namespace HamStartup
 
         private Control BuildMonitorContent()
         {
-            TableLayoutPanel content = new TableLayoutPanel();
-            content.Dock = DockStyle.Fill;
-            content.BackColor = UiTheme.Bg;
-            content.ColumnCount = 2;
-            content.RowCount = 1;
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 390));
-            content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            _monitorSplit = new SplitContainer();
+            _monitorSplit.Dock = DockStyle.Fill;
+            _monitorSplit.Orientation = Orientation.Vertical;
+            _monitorSplit.SplitterWidth = 7;
+            _monitorSplit.Panel1MinSize = 0;
+            _monitorSplit.Panel2MinSize = 0;
+            _monitorSplit.BackColor = Color.FromArgb(190, 203, 220);
+            if (_resizeTip != null) _resizeTip.SetToolTip(_monitorSplit, "拖动分隔条调整左侧软件列表与右侧详情的宽度");
 
             _monitorList = new ListView();
             _monitorList.Dock = DockStyle.Fill;
@@ -159,9 +161,9 @@ namespace HamStartup
                     ProcessUtil.OpenFolder(app.Path);
             };
 
-            content.Controls.Add(_monitorList, 0, 0);
-            content.Controls.Add(BuildMonitorDetailCard(), 1, 0);
-            return content;
+            _monitorSplit.Panel1.Controls.Add(_monitorList);
+            _monitorSplit.Panel2.Controls.Add(BuildMonitorDetailCard());
+            return _monitorSplit;
         }
 
         private Control BuildMonitorDetailCard()
@@ -322,7 +324,7 @@ namespace HamStartup
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("软件：" + app.Name + (app.IsConfigured ? "（当前方案）" : "（自动发现）"));
             sb.AppendLine("进程：" + app.ProcessName + (app.Running ? "   PID " + app.Pid : ""));
-            string statusSuffix = (!app.Responding && !app.Status.Contains("无响应")) ? "   [无响应]" : "";
+            string statusSuffix = (app.Running && !app.Responding && !app.Status.Contains("无响应")) ? "   [无响应]" : "";
             sb.AppendLine("状态：" + app.Status + statusSuffix);
             if (app.StartTime.HasValue) sb.AppendLine("启动：" + app.StartTime.Value.ToString("yyyy-MM-dd HH:mm:ss"));
             if (app.Running)

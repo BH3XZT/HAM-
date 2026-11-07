@@ -1,6 +1,7 @@
 ﻿0d080bcf1980291bf10d8c3c7cbba5fd80e2536de53a96e34c9c14a59eb94096  releases/v1.2/使用说明.md
 1665722b10854be4af098e47789dd2f82f6fda3b4a690a688978e615a17cd6f0  releases/v1.3/使用说明.md
 1eaa9d71ee6ceb7b17daf7e591d2c60c1e93d3fd983b8342faaf2e93a9bea236  releases/v1.3/screenshot-start.png
+2782bf0c0d4302b3fafecb186f9445da14b6a24daa8fa2eeaa95b293361d5847  releases/v1.3.1/screenshot-connection.png
 2e47d924ed315f62622c41aba8224dcd7ee9692b9f69145a1febb1e3e5661fe7  releases/v1.0/HamStartup-v1.0.zip
 3054e9315f49c94b9eb5f12016a685e3153dfd5b86d4d06b9186df41b10a2075  releases/v1.2/screenshot-udp.png
 315360ef6a71ad38250146e51888421cc1f3312da69e91ed33a8fe488e996319  releases/v1.2/screenshot-monitor.png
@@ -11,8 +12,11 @@
 59190cc65c90524cee2268a14efe73e70798fdbe21945b34a4afb9b9d45f9221  releases/v1.0/screenshot-udp.png
 59afab467e8c2812ee5aa0c3d7c4d7264ef1931304131ac1ddad1b75ffb87963  releases/v1.0/HamStartup.exe
 6a0062e8a4df7cb0a6f075f9427ab0a00d9e9f84aa200d3f864b1976c9ad3240  releases/v1.0/使用说明.md
+6a1fbc215e5186abd54b6c79df41a9a16015cb106011c104b8ab2fad816280e2  releases/v1.3.1/screenshot-monitor.png
+74160be329ae7132a87a4fac5ae1e0f60292624bea02d3900d62b2e106055006  releases/v1.3.1/使用说明.md
 7606d5ef689bd78b1e8eb50414c73210a0163b013010f1e8a17585e82fe44a9b  releases/v1.0/screenshot-start.png
 7c8e8362bd29fb109e94da48c2527d398abe861d1f4fec9cb4e2da02afc4255a  releases/v1.3/HamStartup-v1.3.zip
+80fd809603f1ed723f040a36231cb8d3e8694e3ce3f30b1906c82c185fb2baf7  releases/v1.3.1/HamStartup-v1.3.1.zip
 9548769752ddac2ae594529c75193f370521d0f965d083ad94f5ca6e29c865b8  releases/v1.3/screenshot-connection.png
 a8737b0a97a2a10eb1ed3b05312c2a94ff03e4882a99e2739edf5652b7374603  releases/v1.2/HamStartup-v1.2.zip
 a9453fd9d2db68f30aa407042d405136b3def778c058bd58d4135297d1657e85  releases/v1.1/screenshot-start.png
@@ -20,3 +24,5 @@ c1821285c41f651ba82821083a85d716a6308228759de4dca36260e1bdb2eb46  releases/v1.2/
 ca309afd8e280052fed1c960e3bcfb6158789827df63c2fa4a28d6e0cb3c2e76  releases/v1.3/HamStartup.exe
 cedff4bbf0c391d9ba35af39345af8a7d11ee69d9cc6785245bc8fc94a0a952a  releases/v1.1/HamStartup-v1.1.zip
 dcefb2197b6450b46888799fbc77c7bf8d837921ddf786ed7064ed03f01bb357  releases/v1.2/screenshot-start.png
+f1e10799322128c2fcbf72f9d38fa4ce9a793b3c7f1a1c094c201c825fd7a576  releases/v1.3.1/screenshot-start.png
+f70b97ef0656e7396cb8db5bb232365249c701488046f9f2e0a4202ef635a7c7  releases/v1.3.1/HamStartup.exe
